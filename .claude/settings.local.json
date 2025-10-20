@@ -1,0 +1,271 @@
+{
+  "env": {
+    "CLAUDE_CODE_MAX_OUTPUT_TOKENS": "8000",
+    "DISABLE_NON_ESSENTIAL_MODEL_CALLS": "1",
+    "DISABLE_COST_WARNINGS": "1",
+    "USE_BUILTIN_RIPGREP": "1",
+    "CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR": "1",
+    "CLAUDE_CODE_DISABLE_TERMINAL_TITLE": "0",
+    "CLAUDE_CODE_API_KEY_HELPER_TTL_MS": "3600000",
+    "CLAUDE_CODE_USE_VERTEX": "1",
+    "CLOUD_ML_REGION": "global",
+    "ANTHROPIC_VERTEX_PROJECT_ID": "your-gcp-project-id",
+    "VERTEX_REGION_CLAUDE_3_5_SONNET": "global",
+    "VERTEX_REGION_CLAUDE_3_5_HAIKU": "global",
+    "VERTEX_REGION_CLAUDE_3_7_SONNET": "global",
+    "VERTEX_REGION_CLAUDE_4_0_OPUS": "global",
+    "VERTEX_REGION_CLAUDE_4_0_SONNET": "global",
+    "VERTEX_REGION_CLAUDE_4_1_OPUS": "global",
+    "VERTEX_REGION_CLAUDE_4_5_SONNET": "global",
+    "ANTHROPIC_MODEL": "claude-sonnet-4-5@20250929",
+    "ANTHROPIC_SMALL_FAST_MODEL": "claude-3-5-haiku@20241022"
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "python3 .claude/scripts/context-monitor.py"
+  },
+  "disabledMcpjsonServers": [
+    "web-scraper",
+    "system-admin",
+    "network-tools"
+  ],
+  "apiKeyHelper": "/bin/generate_temp_api_key.sh",
+  "cleanupPeriodDays": 90,
+  "permissions": {
+    "additionalDirectories": [
+      "../docs/",
+      "../shared-components/",
+      "~/projects/common-utils/",
+      "/opt/company-tools/"
+    ],
+    "allow": [
+      "Bash(npm:*)",
+      "Bash(yarn:*)",
+      "Bash(node:*)",
+      "Bash(git:*)",
+      "Bash(docker:*)",
+      "Bash(python:*)",
+      "Bash(pip:*)",
+      "Read(**/*.json)",
+      "Read(**/*.js)",
+      "Read(**/*.ts)",
+      "Read(**/*.py)",
+      "Edit(**/*.js)",
+      "Edit(**/*.ts)",
+      "Edit(**/*.py)",
+      "Edit(**/*.json)",
+      "Write(**/*.js)",
+      "Write(**/*.ts)",
+      "Write(**/*.py)",
+      "Bash(git status)",
+      "Bash(git diff:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(git pull:*)",
+      "Bash(git log:*)",
+      "Bash(npm run lint)",
+      "Bash(npm run test:*)",
+      "Bash(npm run build)",
+      "Bash(npm start)"
+    ],
+    "deny": [
+      "Read(./.env*)",
+      "Read(./secrets/**)",
+      "Bash(rm -rf:*)",
+      "Bash(sudo:*)"
+    ]
+  },
+  "enableAllProjectMcpServers": true,
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [[ -n \"$TELEGRAM_BOT_TOKEN\" && -n \"$TELEGRAM_CHAT_ID\" ]]; then echo \"$(date +%s)\" > ~/.claude/session_start.tmp; PROJECT_DIR=\"$(basename \"$(pwd)\")\" && MESSAGE=\"🚀 <b>Claude Code Session Started</b>%0A📁 Project: $PROJECT_DIR%0A⏰ Time: $(date '+%H:%M:%S')%0A📅 Date: $(date '+%Y-%m-%d')\"; curl -s -X POST \"https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage\" -d \"chat_id=$TELEGRAM_CHAT_ID\" -d \"text=$MESSAGE\" -d \"parse_mode=HTML\" >/dev/null 2>&1; fi"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [[ -n \"$TELEGRAM_BOT_TOKEN\" && -n \"$TELEGRAM_CHAT_ID\" ]]; then END_TIME=\"$(date +%s)\"; if [[ -f ~/.claude/session_start.tmp ]]; then START_TIME=\"$(cat ~/.claude/session_start.tmp)\"; DURATION=\"$((END_TIME - START_TIME))\"; MINUTES=\"$((DURATION / 60))\"; SECONDS=\"$((DURATION % 60))\"; DURATION_TEXT=\"${MINUTES}m ${SECONDS}s\"; rm -f ~/.claude/session_start.tmp; else DURATION_TEXT=\"Unknown\"; fi; PROJECT_DIR=\"$(basename \"$(pwd)\")\"; MEMORY_MB=\"$(ps -o rss= -p $$ 2>/dev/null | awk '{print int($1/1024)}' || echo 'N/A')\"; MESSAGE=\"✅ <b>Claude Code Session Completed</b>%0A📁 Project: $PROJECT_DIR%0A⏱️ Duration: $DURATION_TEXT%0A💾 Memory Used: ${MEMORY_MB}MB%0A⏰ Finished: $(date '+%H:%M:%S')%0A📅 Date: $(date '+%Y-%m-%d')\"; curl -s -X POST \"https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage\" -d \"chat_id=$TELEGRAM_CHAT_ID\" -d \"text=$MESSAGE\" -d \"parse_mode=HTML\" >/dev/null 2>&1 || echo \"Failed to send detailed Telegram notification\"; else echo \"⚠️ Detailed Telegram notification skipped: Set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID\"; fi"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [[ -n \"$TELEGRAM_BOT_TOKEN\" && -n \"$TELEGRAM_CHAT_ID\" ]]; then MESSAGE=\"🤖 Claude Code finished working at $(date '+%Y-%m-%d %H:%M:%S')\"; curl -s -X POST \"https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage\" -d \"chat_id=$TELEGRAM_CHAT_ID\" -d \"text=$MESSAGE\" -d \"parse_mode=HTML\" >/dev/null 2>&1 || echo \"Failed to send Telegram notification\"; else echo \"⚠️ Telegram notification skipped: Set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID environment variables\"; fi"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [[ -f \"$CLAUDE_TOOL_FILE_PATH\" ]]; then cp \"$CLAUDE_TOOL_FILE_PATH\" \"$CLAUDE_TOOL_FILE_PATH.backup.$(date +%s)\" 2>/dev/null || true; fi"
+          }
+        ]
+      },
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo \"$(date +%s.%N),$(ps -o %cpu= -p $$),$(ps -o rss= -p $$),$CLAUDE_TOOL_NAME,start\" >> ~/.claude/performance.csv"
+          }
+        ]
+      },
+      {
+        "matcher": "WebSearch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -c \"import json, sys, re; from datetime import datetime; input_data = json.load(sys.stdin); tool_input = input_data.get('tool_input', {}); query = tool_input.get('query', ''); current_year = str(datetime.now().year); has_year = re.search(r'\\\\b20\\\\d{2}\\\\b', query); has_temporal = any(word in query.lower() for word in ['latest', 'recent', 'current', 'new', 'now', 'today']); should_add_year = not has_year and not has_temporal; modified_query = f'{query} {current_year}' if should_add_year else query; output = {'hookSpecificOutput': {'hookEventName': 'PreToolUse', 'modifiedToolInput': {'query': modified_query}}}; print(json.dumps(output)); sys.exit(0)\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [[ -f package.json ]] && grep -q '\"build\"' package.json; then npm run build 2>/dev/null || yarn build 2>/dev/null || true; elif [[ -f Makefile ]]; then make 2>/dev/null || true; elif [[ -f Cargo.toml ]]; then cargo build 2>/dev/null || true; elif [[ -f pom.xml ]]; then mvn compile 2>/dev/null || true; elif [[ -f build.gradle ]]; then ./gradlew build 2>/dev/null || true; fi"
+          }
+        ]
+      },
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo \"$(date +%s.%N),$(ps -o %cpu= -p $$),$(ps -o rss= -p $$),$CLAUDE_TOOL_NAME,end\" >> ~/.claude/performance.csv; if [[ $(wc -l < ~/.claude/performance.csv) -gt 1000 ]]; then tail -n 500 ~/.claude/performance.csv > ~/.claude/performance.csv.tmp && mv ~/.claude/performance.csv.tmp ~/.claude/performance.csv; fi"
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'input=$(cat); FILE_PATH=$(echo \"$input\" | jq -r \".tool_input.file_path // empty\"); SUCCESS=$(echo \"$input\" | jq -r \".tool_response.success // false\"); if [ \"$SUCCESS\" = \"true\" ] && [[ \"$FILE_PATH\" =~ \\.(js|jsx|ts|tsx)$ ]] && [[ ! \"$FILE_PATH\" =~ node_modules ]]; then echo \"🔍 Next.js Code Quality Enforcer: Reviewing $FILE_PATH...\"; ISSUES=0; if [ -f \"$FILE_PATH\" ]; then if [[ \"$FILE_PATH\" =~ app/.* ]]; then echo \"📁 App Router file detected: $FILE_PATH\"; if [[ \"$FILE_PATH\" =~ page\\.(js|jsx|ts|tsx)$ ]] && ! grep -q \"export default function\" \"$FILE_PATH\" 2>/dev/null && ! grep -q \"export default async function\" \"$FILE_PATH\" 2>/dev/null; then echo \"❌ Page component must export default function\" >&2; ((ISSUES++)); fi; if [[ \"$FILE_PATH\" =~ layout\\.(js|jsx|ts|tsx)$ ]] && ! grep -q \"children\" \"$FILE_PATH\" 2>/dev/null; then echo \"❌ Layout component should accept children prop\" >&2; ((ISSUES++)); fi; if [[ \"$FILE_PATH\" =~ page\\.(js|jsx|ts|tsx)$ ]] && ! grep -q \"Metadata\" \"$FILE_PATH\" 2>/dev/null && ! grep -q \"metadata\" \"$FILE_PATH\" 2>/dev/null; then echo \"⚠️ Consider adding metadata export for SEO\"; fi; if grep -q \"use client\" \"$FILE_PATH\" 2>/dev/null; then echo \"🖥️ Client Component detected\"; if ! grep -E \"(useState|useEffect|onClick|onChange|onSubmit)\" \"$FILE_PATH\" 2>/dev/null; then echo \"⚠️ Client component without interactivity - consider Server Component\"; fi; else echo \"🚀 Server Component (default)\"; if grep -E \"(useState|useEffect|onClick|onChange|onSubmit)\" \"$FILE_PATH\" 2>/dev/null; then echo \"❌ Interactive features in Server Component - add \\\"use client\\\" directive\" >&2; ((ISSUES++)); fi; fi; fi; if [[ \"$FILE_PATH\" =~ \\.(jsx|tsx)$ ]]; then if ! grep -q \"import.*React\" \"$FILE_PATH\" 2>/dev/null && grep -q \"<\" \"$FILE_PATH\" 2>/dev/null; then echo \"⚠️ JSX without React import (Next.js 17+ handles this automatically)\"; fi; if ! grep -q \"FC\\|FunctionComponent\" \"$FILE_PATH\" 2>/dev/null && grep -q \"props\" \"$FILE_PATH\" 2>/dev/null && [[ \"$FILE_PATH\" =~ \\.tsx$ ]]; then echo \"💡 Consider using React.FC or explicit prop types for TypeScript\"; fi; fi; if [[ \"$FILE_PATH\" =~ \\.js$ ]] && [ -f \"tsconfig.json\" ]; then echo \"📝 JavaScript file in TypeScript project: $FILE_PATH\"; echo \"💡 Consider migrating to TypeScript for better type safety\"; fi; if grep -q \"next/image\" \"$FILE_PATH\" 2>/dev/null; then echo \"✅ Using next/image for optimized images\"; elif grep -q \"<img\" \"$FILE_PATH\" 2>/dev/null; then echo \"🖼️ Regular <img> tag detected\"; echo \"💡 Consider using next/image for better performance\"; fi; if grep -q \"next/link\" \"$FILE_PATH\" 2>/dev/null; then echo \"✅ Using next/link for navigation\"; elif grep -q \"<a href=\" \"$FILE_PATH\" 2>/dev/null && ! grep -q \"http\" \"$FILE_PATH\" 2>/dev/null; then echo \"🔗 Regular <a> tag for internal links detected\"; echo \"💡 Use next/link for internal navigation\"; fi; if grep -q \"getServerSideProps\\|getStaticProps\" \"$FILE_PATH\" 2>/dev/null; then echo \"⚠️ Pages Router data fetching methods detected\"; echo \"💡 Consider migrating to App Router with Server Components\"; fi; if grep -q \"className=.*{\" \"$FILE_PATH\" 2>/dev/null; then echo \"🎨 Dynamic className detected\"; if ! grep -q \"clsx\\|classnames\\|cn(\" \"$FILE_PATH\" 2>/dev/null; then echo \"💡 Consider using clsx or similar utility for className concatenation\"; fi; fi; if [ $ISSUES -eq 0 ]; then echo \"✅ Code quality check passed for $FILE_PATH\"; else echo \"❌ Found $ISSUES code quality issues in $FILE_PATH\" >&2; exit 2; fi; else echo \"❌ File $FILE_PATH not found\"; fi; else echo \"ℹ️ Code quality check skipped (not a JavaScript/TypeScript file or failed operation)\"; fi'",
+            "timeout": 20
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if command -v semgrep >/dev/null 2>&1; then semgrep --config=auto \"$CLAUDE_TOOL_FILE_PATH\" 2>/dev/null || true; fi; if command -v bandit >/dev/null 2>&1 && [[ \"$CLAUDE_TOOL_FILE_PATH\" == *.py ]]; then bandit \"$CLAUDE_TOOL_FILE_PATH\" 2>/dev/null || true; fi; if command -v gitleaks >/dev/null 2>&1; then gitleaks detect --source=\"$CLAUDE_TOOL_FILE_PATH\" --no-git 2>/dev/null || true; fi; if grep -qE '(password|secret|key|token)\\s*=\\s*[\"\\'][^\"\\'\n]{8,}' \"$CLAUDE_TOOL_FILE_PATH\" 2>/dev/null; then echo \"Warning: Potential hardcoded secrets detected in $CLAUDE_TOOL_FILE_PATH\" >&2; fi"
+          }
+        ]
+      },
+      {
+        "matcher": "Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [[ -f package.json ]] && npm run test:quick --silent >/dev/null 2>&1; then echo '✅ Tests passed'; else echo '⚠️ Tests may need attention'; fi"
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|MultiEdit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [[ -n \"$CLAUDE_TOOL_FILE_PATH\" ]] && git rev-parse --git-dir >/dev/null 2>&1; then git add \"$CLAUDE_TOOL_FILE_PATH\" 2>/dev/null || true; fi"
+          }
+        ]
+      },
+      {
+        "matcher": "Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [[ \"$CLAUDE_TOOL_FILE_PATH\" == *.py ]]; then black \"$CLAUDE_TOOL_FILE_PATH\" 2>/dev/null || true; fi"
+          }
+        ]
+      },
+      {
+        "matcher": "Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [[ \"$CLAUDE_TOOL_FILE_PATH\" == *package.json || \"$CLAUDE_TOOL_FILE_PATH\" == *requirements.txt || \"$CLAUDE_TOOL_FILE_PATH\" == *Cargo.toml || \"$CLAUDE_TOOL_FILE_PATH\" == *pom.xml || \"$CLAUDE_TOOL_FILE_PATH\" == *Gemfile ]]; then echo \"Dependency file modified: $CLAUDE_TOOL_FILE_PATH\"; if [[ \"$CLAUDE_TOOL_FILE_PATH\" == *package.json ]] && command -v npm >/dev/null 2>&1; then npm audit 2>/dev/null || true; npx npm-check-updates 2>/dev/null || true; elif [[ \"$CLAUDE_TOOL_FILE_PATH\" == *requirements.txt ]] && command -v safety >/dev/null 2>&1; then safety check -r \"$CLAUDE_TOOL_FILE_PATH\" 2>/dev/null || true; elif [[ \"$CLAUDE_TOOL_FILE_PATH\" == *Cargo.toml ]] && command -v cargo >/dev/null 2>&1; then cargo audit 2>/dev/null || true; fi; fi"
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo \"[$(date '+%Y-%m-%d %H:%M:%S')] File modified: $CLAUDE_TOOL_FILE_PATH\" >> ~/.claude/changes.log"
+          }
+        ]
+      },
+      {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo \"[$(date '+%Y-%m-%d %H:%M:%S')] File created: $CLAUDE_TOOL_FILE_PATH\" >> ~/.claude/changes.log"
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [[ \"$CLAUDE_TOOL_FILE_PATH\" == *.js || \"$CLAUDE_TOOL_FILE_PATH\" == *.ts || \"$CLAUDE_TOOL_FILE_PATH\" == *.jsx || \"$CLAUDE_TOOL_FILE_PATH\" == *.tsx ]]; then npx eslint \"$CLAUDE_TOOL_FILE_PATH\" --fix 2>/dev/null || true; elif [[ \"$CLAUDE_TOOL_FILE_PATH\" == *.py ]]; then pylint \"$CLAUDE_TOOL_FILE_PATH\" 2>/dev/null || true; elif [[ \"$CLAUDE_TOOL_FILE_PATH\" == *.rb ]]; then rubocop \"$CLAUDE_TOOL_FILE_PATH\" --auto-correct 2>/dev/null || true; fi"
+          }
+        ]
+      },
+      {
+        "matcher": "Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if git rev-parse --git-dir >/dev/null 2>&1 && [[ -n \"$CLAUDE_TOOL_FILE_PATH\" ]]; then git add \"$CLAUDE_TOOL_FILE_PATH\" 2>/dev/null; CHANGED_LINES=$(git diff --cached --numstat \"$CLAUDE_TOOL_FILE_PATH\" 2>/dev/null | awk '{print $1+$2}'); if [[ $CHANGED_LINES -gt 0 ]]; then FILENAME=$(basename \"$CLAUDE_TOOL_FILE_PATH\"); if [[ $CHANGED_LINES -lt 10 ]]; then SIZE=\"minor\"; elif [[ $CHANGED_LINES -lt 50 ]]; then SIZE=\"moderate\"; else SIZE=\"major\"; fi; MSG=\"Update $FILENAME: $SIZE changes ($CHANGED_LINES lines)\"; git commit -m \"$MSG\" \"$CLAUDE_TOOL_FILE_PATH\" 2>/dev/null || true; fi; fi"
+          }
+        ]
+      },
+      {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if git rev-parse --git-dir >/dev/null 2>&1 && [[ -n \"$CLAUDE_TOOL_FILE_PATH\" ]]; then git add \"$CLAUDE_TOOL_FILE_PATH\" 2>/dev/null; FILENAME=$(basename \"$CLAUDE_TOOL_FILE_PATH\"); git commit -m \"Add new file: $FILENAME\" \"$CLAUDE_TOOL_FILE_PATH\" 2>/dev/null || true; fi"
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [[ -n \"$TELEGRAM_BOT_TOKEN\" && -n \"$TELEGRAM_CHAT_ID\" ]]; then MESSAGE=\"🎯 Claude Code subagent completed task at $(date '+%Y-%m-%d %H:%M:%S')\"; curl -s -X POST \"https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage\" -d \"chat_id=$TELEGRAM_CHAT_ID\" -d \"text=$MESSAGE\" -d \"parse_mode=HTML\" >/dev/null 2>&1 || echo \"Failed to send Telegram notification\"; else echo \"⚠️ Telegram notification skipped: Set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID environment variables\"; fi"
+          }
+        ]
+      }
+    ]
+  }
+}

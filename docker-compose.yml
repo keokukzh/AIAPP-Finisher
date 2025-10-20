@@ -1,0 +1,151 @@
+version: '3.8'
+
+services:
+  # ==============================================================================
+  # Main Application - KI-Projektmanagement-System
+  # Modern UI + FastAPI Backend + Claude-Flow Integration
+  # ==============================================================================
+  ai-project-manager:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ai-project-manager
+    image: ki-projektmanagement:latest
+    ports:
+      - "${UI_PORT:-8501}:8501"         # Modern Streamlit UI
+      - "${API_PORT:-8000}:8000"        # FastAPI Backend
+    volumes:
+      # Project to analyze (read-only for security)
+      - ${PROJECT_PATH:-./test-project}:/workspace:ro
+      # Persistent data directories
+      - ./analysis_output:/app/analysis_output
+      - ./output:/app/output
+      - ./.swarm:/app/.swarm             # Claude-Flow swarm data
+      - ./logs:/app/logs                 # Application logs
+    environment:
+      # AI Provider API Keys
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
+      # Database connections
+      - MONGODB_URL=${MONGODB_URL:-mongodb://mongodb:27017/appfinisher}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      # Application settings
+      - PYTHONPATH=/app
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    env_file:
+      - config.env
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - ai-pm-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ==============================================================================
+  # MongoDB - Persistent Storage
+  # ==============================================================================
+  mongodb:
+    image: mongo:7
+    container_name: ai-pm-mongodb
+    volumes:
+      - mongodb_data:/data/db
+    ports:
+      - "${MONGO_PORT:-27017}:27017"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - ai-pm-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+  # ==============================================================================
+  # Redis - Caching Layer
+  # ==============================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: ai-pm-redis
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - ai-pm-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+  # ==============================================================================
+  # Monitoring Services
+  # ==============================================================================
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: ai-pm-prometheus
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    restart: unless-stopped
+    networks:
+      - ai-pm-network
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: ai-pm-grafana
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+    volumes:
+      - grafana_data:/var/lib/grafana
+    restart: unless-stopped
+    networks:
+      - ai-pm-network
+
+volumes:
+  mongodb_data:
+  redis_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  ai-pm-network:
+    driver: bridge

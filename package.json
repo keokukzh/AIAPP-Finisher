@@ -1,0 +1,24 @@
+{
+  "name": "ki-projektmanagement-system",
+  "version": "1.0.0",
+  "description": "AI-powered project management system with Claude-Flow integration",
+  "main": "index.js",
+  "scripts": {
+    "claude-flow": "npx claude-flow@alpha",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "ai",
+    "project-management",
+    "claude",
+    "claude-flow",
+    "swarm",
+    "mcp"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "claude-flow": "alpha"
+  }
+}
+

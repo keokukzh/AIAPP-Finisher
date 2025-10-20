@@ -1,0 +1,72 @@
+version: '3.8'
+
+services:
+  ai-project-manager-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ai-project-manager-dev
+    ports:
+      - "${API_DEV_PORT:-8000}:8000"
+      - "${UI_DEV_PORT:-8501}:8501"
+    volumes:
+      - ./:/app
+      - ./analysis_output:/app/analysis_output
+      - ./output:/app/output
+      - ./logs:/app/logs
+    environment:
+      - LOG_LEVEL=${LOG_LEVEL:-DEBUG}
+      - MONGODB_URL=${MONGODB_URL:-mongodb://mongodb:27017/appfinisher}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+    env_file:
+      - config.env
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    command: bash -lc "uvicorn app:app --host 0.0.0.0 --port 8000 --reload"
+    restart: unless-stopped
+    networks:
+      - ai-pm-dev-network
+
+  mongodb:
+    image: mongo:7
+    container_name: ai-pm-mongodb-dev
+    ports:
+      - "${MONGO_DEV_PORT:-27018}:27017"
+    volumes:
+      - mongo_dev_data:/data/db
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - ai-pm-dev-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: ai-pm-redis-dev
+    ports:
+      - "${REDIS_DEV_PORT:-6380}:6379"
+    volumes:
+      - redis_dev_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - ai-pm-dev-network
+
+volumes:
+  mongo_dev_data:
+  redis_dev_data:
+
+networks:
+  ai-pm-dev-network:
+    driver: bridge
